@@ -44,6 +44,13 @@
             ],
             "target.components_add": ["STMOD_CELLULAR"],
             "stmod_cellular.provide-default": "true"
+        },
+        "EP_AGORA": {
+            "trace-level": "TRACE_LEVEL_DEBUG",
+            "nsapi.default-cellular-apn": "\"shared.m2m.ch\"",
+            "cellular.use-apn-lookup": false,
+            "cellular.debug-at": true,
+            "mbed-trace.enable": true
         }
     }
 }
