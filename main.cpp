@@ -36,6 +36,15 @@ const char *host_name = MBED_CONF_APP_ECHO_SERVER_HOSTNAME;
 // Echo server port (same for TCP and UDP)
 const int port = MBED_CONF_APP_ECHO_SERVER_PORT;
 
+// IoT Technologies
+static const int IOT_TECHNOLOGY_CATM1           = 0;
+static const int IOT_TECHNOLOGY_NBIOT           = 1;
+static const int IOT_TECHNOLOGY_CATM1_PREFERRED = 2;
+static const int IOT_TECHNOLOGY_NBIOT_PREFERRED = 3;
+
+// Desired IoT technology
+static const int DESIRED_IOT_TECHNOLOGY = IOT_TECHNOLOGY_NBIOT_PREFERRED;
+
 static rtos::Mutex trace_mutex;
 
 #if MBED_CONF_MBED_TRACE_ENABLE
@@ -90,6 +99,47 @@ void print_function(const char *format, ...)
     trace_mutex.unlock();
 }
 
+void set_iot_technology(int desired_iot_technology)
+{
+    int iot_technology = -1;
+    CellularDevice *dev = CellularDevice::get_target_default_instance();
+    dev->hard_power_on();
+    dev->soft_power_on();
+
+    // Check the current IoT technology first
+    ATHandler *at_handler = dev->get_at_handler();
+    at_handler->lock();
+    at_handler->cmd_start_stop("#WS46", "?");
+    at_handler->resp_start("#WS46:");
+
+    // Read the current IoT technology
+    iot_technology = at_handler->read_int();
+    at_handler->resp_stop();
+
+    // If already configured as desired, return
+    if (iot_technology == desired_iot_technology) {
+        at_handler->unlock();
+        return;
+    }
+
+    // Set the desired IoT technology
+    at_handler->at_cmd_discard("#WS46", "=", "%d", desired_iot_technology);
+    if (at_handler->get_last_error() != NSAPI_ERROR_OK) {
+        printf("ERROR: Unable to set IoT technology!\n");
+        at_handler->unlock();
+        return;
+    }
+
+    at_handler->unlock();
+
+    // Power cycle the module
+    dev->hard_power_off();
+    dev->hard_power_on();
+    dev->soft_power_on();
+
+    return;
+}
+
 void dot_event()
 {
     while (true) {
@@ -112,6 +162,8 @@ nsapi_error_t do_connect()
 {
     nsapi_error_t retcode = NSAPI_ERROR_OK;
     uint8_t retry_counter = 0;
+
+    set_iot_technology(DESIRED_IOT_TECHNOLOGY);
 
     while (iface->get_connection_status() != NSAPI_STATUS_GLOBAL_UP) {
         retcode = iface->connect();
