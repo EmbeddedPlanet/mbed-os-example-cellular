@@ -45,6 +45,14 @@ static const int IOT_TECHNOLOGY_NBIOT_PREFERRED = 3;
 // Desired IoT technology
 static const int DESIRED_IOT_TECHNOLOGY = IOT_TECHNOLOGY_NBIOT_PREFERRED;
 
+// WDS-Side Stacks
+static const int WDS_SIDE_STACK_GERAN_ONLY          = 12;
+static const int WDS_SIDE_STACK_EUTRAN_ONLY         = 28;
+static const int WDS_SIDE_STACK_GERAN_AND_EUTRAN    = 30;
+
+// Desired WDS-Side Stack
+static const int DESIRED_WDS_SIDE_STACK = WDS_SIDE_STACK_EUTRAN_ONLY;
+
 static rtos::Mutex trace_mutex;
 
 #if MBED_CONF_MBED_TRACE_ENABLE
@@ -99,12 +107,9 @@ void print_function(const char *format, ...)
     trace_mutex.unlock();
 }
 
-void set_iot_technology(int desired_iot_technology)
+void set_iot_technology(CellularDevice *dev, int desired_iot_technology)
 {
     int iot_technology = -1;
-    CellularDevice *dev = CellularDevice::get_target_default_instance();
-    dev->hard_power_on();
-    dev->soft_power_on();
 
     // Check the current IoT technology first
     ATHandler *at_handler = dev->get_at_handler();
@@ -140,6 +145,42 @@ void set_iot_technology(int desired_iot_technology)
     return;
 }
 
+void set_wds_side_stack(CellularDevice *dev, int desired_side_stack)
+{
+    int side_stack = -1;
+
+    // Check the current WDS side stack first
+    ATHandler *at_handler = dev->get_at_handler();
+    at_handler->lock();
+    at_handler->cmd_start_stop("+WS46", "?");
+    at_handler->resp_start("+WS46:");
+
+    // Read the current WDS side stack
+    side_stack = at_handler->read_int();
+    at_handler->resp_stop();
+
+    // If already configured as desired, return
+    if (side_stack == desired_side_stack) {
+        at_handler->unlock();
+        return;
+    }
+
+    // Set the desired WDS side stack
+    at_handler->at_cmd_discard("+WS46", "=", "%d", desired_side_stack);
+    if (at_handler->get_last_error() != NSAPI_ERROR_OK) {
+        printf("ERROR: Unable to set WDS-Side Stack!\n");
+        at_handler->unlock();
+        return;
+    }
+
+    at_handler->unlock();
+
+    // Power cycle the module
+    dev->hard_power_off();
+    dev->hard_power_on();
+    dev->soft_power_on();
+}
+
 void dot_event()
 {
     while (true) {
@@ -163,7 +204,12 @@ nsapi_error_t do_connect()
     nsapi_error_t retcode = NSAPI_ERROR_OK;
     uint8_t retry_counter = 0;
 
-    set_iot_technology(DESIRED_IOT_TECHNOLOGY);
+    CellularDevice *dev = CellularDevice::get_target_default_instance();
+    dev->hard_power_on();
+    dev->soft_power_on();
+
+    set_iot_technology(dev, DESIRED_IOT_TECHNOLOGY);
+    set_wds_side_stack(dev, DESIRED_WDS_SIDE_STACK);
 
     while (iface->get_connection_status() != NSAPI_STATUS_GLOBAL_UP) {
         retcode = iface->connect();
