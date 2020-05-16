@@ -186,6 +186,8 @@ void set_wds_side_stack(CellularDevice *dev, int desired_side_stack)
 
 void set_desired_lte_bands(CellularDevice *dev)
 {
+    int gsm_bands_bitmask = -1;
+    int umts_bands_bitmask = -1;
     int lte_bands_bitmask = -1;
 
     // Check the LTE bands first
@@ -194,13 +196,14 @@ void set_desired_lte_bands(CellularDevice *dev)
     at_handler->cmd_start_stop("#BND", "?");
     at_handler->resp_start("#BND:");
 
-    // Skip GSM and UMTS bands
-    at_handler->skip_param();
-    at_handler->skip_param();
-
-    // Read the current LTE bands
+    // Read the current bands
+    gsm_bands_bitmask = at_handler->read_int();
+    umts_bands_bitmask = at_handler->read_int();
     lte_bands_bitmask = at_handler->read_int();
     at_handler->resp_stop();
+    tr_info("GSM Bands Bitmask:     %d", gsm_bands_bitmask);
+    tr_info("UMTS Bands Bitmask:    %d", umts_bands_bitmask);
+    tr_info("LTE Bands Bitmask:     %d", lte_bands_bitmask);
 
     // If already configured as desired, return
     if (lte_bands_bitmask == DESIRED_LTE_BANDS_BITMASK) {
@@ -212,9 +215,16 @@ void set_desired_lte_bands(CellularDevice *dev)
     at_handler->at_cmd_discard("#BND", "=", "%d%d%d", 5, 0, DESIRED_LTE_BANDS_BITMASK);
     if (at_handler->get_last_error() != NSAPI_ERROR_OK) {
         printf("ERROR: Unable to set LTE bands!\n");
+        at_handler->unlock();
+        return;
     }
 
     at_handler->unlock();
+
+    // Power cycle the module
+    dev->hard_power_off();
+    dev->hard_power_on();
+    dev->soft_power_on();
 }
 
 void dot_event()
