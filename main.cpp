@@ -53,6 +53,9 @@ static const int WDS_SIDE_STACK_GERAN_AND_EUTRAN    = 30;
 // Desired WDS-Side Stack
 static const int DESIRED_WDS_SIDE_STACK = WDS_SIDE_STACK_EUTRAN_ONLY;
 
+// Desired LTE bands bitmask
+static const int DESIRED_LTE_BANDS_BITMASK  = 134742021;
+
 static rtos::Mutex trace_mutex;
 
 #if MBED_CONF_MBED_TRACE_ENABLE
@@ -181,6 +184,39 @@ void set_wds_side_stack(CellularDevice *dev, int desired_side_stack)
     dev->soft_power_on();
 }
 
+void set_desired_lte_bands(CellularDevice *dev)
+{
+    int lte_bands_bitmask = -1;
+
+    // Check the LTE bands first
+    ATHandler *at_handler = dev->get_at_handler();
+    at_handler->lock();
+    at_handler->cmd_start_stop("#BND", "?");
+    at_handler->resp_start("#BND:");
+
+    // Skip GSM and UMTS bands
+    at_handler->skip_param();
+    at_handler->skip_param();
+
+    // Read the current LTE bands
+    lte_bands_bitmask = at_handler->read_int();
+    at_handler->resp_stop();
+
+    // If already configured as desired, return
+    if (lte_bands_bitmask == DESIRED_LTE_BANDS_BITMASK) {
+        at_handler->unlock();
+        return;
+    }
+
+    // Set the desired LTE bands
+    at_handler->at_cmd_discard("#BND", "=", "%d%d%d", 5, 0, DESIRED_LTE_BANDS_BITMASK);
+    if (at_handler->get_last_error() != NSAPI_ERROR_OK) {
+        printf("ERROR: Unable to set LTE bands!\n");
+    }
+
+    at_handler->unlock();
+}
+
 void dot_event()
 {
     while (true) {
@@ -208,6 +244,7 @@ nsapi_error_t do_connect()
     dev->hard_power_on();
     dev->soft_power_on();
 
+    set_desired_lte_bands(dev);
     set_iot_technology(dev, DESIRED_IOT_TECHNOLOGY);
     set_wds_side_stack(dev, DESIRED_WDS_SIDE_STACK);
 
