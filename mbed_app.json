@@ -18,25 +18,26 @@
     "target_overrides": {
         "*": {
             "target.network-default-interface-type": "CELLULAR",
-            "mbed-trace.enable": false,
+            "mbed-trace.enable": true,
             "lwip.ipv4-enabled": true,
             "ppp.ipv4-enabled": true,
             "lwip.ipv6-enabled": true,
             "ppp.ipv6-enabled": true,
             "lwip.ethernet-enabled": false,
-            "lwip.ppp-enabled": true,
+            "lwip.ppp-enabled": false,
             "lwip.tcp-enabled": true,
             "platform.stdio-convert-newlines": true,
             "platform.stdio-baud-rate": 115200,
             "platform.default-serial-baud-rate": 115200,
             "platform.stdio-buffered-serial": true,
-            "cellular.debug-at": false,
-            "cellular.use-apn-lookup": true,
+            "cellular.debug-at": true,
+            "cellular.use-apn-lookup": false,
             "nsapi.default-cellular-sim-pin": null,
             "nsapi.default-cellular-plmn": null,
-            "nsapi.default-cellular-apn": null,
-            "nsapi.default-cellular-username": null,
-            "nsapi.default-cellular-password": null
+            "nsapi.default-cellular-apn": "\"phone\"",
+            "nsapi.default-cellular-username": 0,
+            "nsapi.default-cellular-password": 0,
+            "ppp.enabled": false
         },
         "DISCO_L496AG": {
             "target.macros_add": [
